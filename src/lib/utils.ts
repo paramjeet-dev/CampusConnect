@@ -10,6 +10,13 @@
  * @returns A formatted date string, the original input if invalid,
  * or an empty string if no value is provided.
  */
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 export const formatDate = (dateString: string): string => {
   if (!dateString) return "";
   const date = new Date(dateString);
