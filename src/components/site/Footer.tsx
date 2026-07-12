@@ -25,6 +25,9 @@ export function Footer() {
           <a href="#" className="inline-block transition-transform duration-200 hover:scale-110 ">
             Discord
           </a>
+          <a href="mailto:support@campusconnect.com" className="hover:underline">
+            Contact Us
+          </a>
         </div>
       </div>
     </footer>
