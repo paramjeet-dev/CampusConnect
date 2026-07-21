@@ -5,18 +5,17 @@ import { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { SiteShell } from "@/components/site/SiteShell";
 import { SkeletonEventDetails } from "@/components/events/SkeletonEventDetails";
-import { formatEventDateRange, getGoogleCalendarUrl } from "@/lib/utils";
+import { formatEventDateRange } from "@/lib/utils";
+import { EventActions } from "@/components/Events/EventActions";
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  Calendar,
   Check,
   Copy,
   Download,
   Link as LinkIcon,
   MapPin,
   MapPinOff,
-  Share2,
   Users,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -276,15 +275,6 @@ export default function EventDetailsPage() {
     ? parseCoordinates(event.location)
     : { isCoordinates: false, isValid: true };
 
-  const googleCalendarUrl = getGoogleCalendarUrl({
-    title: event.title,
-    description: event.description || "",
-    event_date: event.event_date || "",
-    start_date: event.start_date,
-    end_date: event.end_date,
-    location: event.location || "",
-  });
-
   const handleRsvpClick = () => {
     if (!user) {
       toast.error("Please log in to RSVP");
@@ -528,17 +518,14 @@ export default function EventDetailsPage() {
               </Button>
             )}
 
-            {hasRsvpd && googleCalendarUrl && (
-              <a
-                href={googleCalendarUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="neu-border flex items-center gap-2 bg-white px-5 py-3 font-mono text-sm font-bold uppercase tracking-wider transition-all duration-300 hover:scale-105 active:scale-95"
-              >
-                <Calendar aria-hidden="true" size={14} strokeWidth={3} />
-                Add to Google Calendar
-              </a>
-            )}
+            <EventActions
+              title={event.title}
+              description={event.description}
+              event_date={event.event_date}
+              start_date={event.start_date}
+              end_date={event.end_date}
+              location={event.location}
+            />
           </div>
 
           {/* Description */}
