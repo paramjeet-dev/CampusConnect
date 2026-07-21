@@ -44,6 +44,27 @@ jobs:
               return allOpenPrs.filter(pr => pr.head.sha === sha);
             }
 
+            async function createOrUpdateComment(prNumber, body, marker) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner, repo, issue_number: prNumber
+              });
+              const existingComment = comments.find(c => c.body.includes(marker));
+              const fullBody = `${body}\n\n${marker}`;
+              
+              if (existingComment) {
+                // If it already says the exact same thing, don't update to avoid spamming notification
+                if (existingComment.body !== fullBody) {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: existingComment.id, body: fullBody
+                  });
+                }
+              } else {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: prNumber, body: fullBody
+                });
+              }
+            }
+
             let prsToProcess = [];
 
             if (context.eventName === 'pull_request_target') {
@@ -60,24 +81,23 @@ jobs:
 
               console.log(`\n🔍 Evaluating PR #${prNumber} (SHA: ${headSha})...`);
 
+              const { data: fullPr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              const targetUser = fullPr.user.login;
+              const failureMarker = `<!-- pr-status-failure-marker -->`;
+
               // 1. Check Merge Conflicts
               let mergeableState = null;
               for (let attempt = 1; attempt <= 3; attempt++) {
-                const { data: fullPr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-                mergeableState = fullPr.mergeable;
+                const { data: checkPr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                mergeableState = checkPr.mergeable;
                 if (mergeableState !== null) break;
                 await new Promise(r => setTimeout(r, 5000));
               }
 
               if (mergeableState === false) {
                 console.log(`⚠️ PR #${prNumber} has merge conflicts.`);
-                const added = await setLabel(prNumber, "Red");
-                if (added) {
-                  await github.rest.issues.createComment({
-                    owner, repo, issue_number: prNumber,
-                    body: `⚠️ **Merge Conflicts Detected:** This PR cannot be merged right now. Please resolve the merge conflicts and push your changes again.`
-                  });
-                }
+                await setLabel(prNumber, "Red");
+                await createOrUpdateComment(prNumber, `@${targetUser} ⚠️ This PR has **merge conflicts**. Please resolve them so CI can proceed.`, failureMarker);
                 continue;
               }
 
@@ -101,6 +121,7 @@ jobs:
 
               let hasFailed = false;
               let isPending = false;
+              let failedNamesList = [];
 
               for (const check of relevantChecks) {
                 const conclusion = check.conclusion;
@@ -108,6 +129,7 @@ jobs:
 
                 if (conclusion === 'failure' || conclusion === 'cancelled' || conclusion === 'timed_out' || conclusion === 'action_required') {
                   hasFailed = true;
+                  failedNamesList.push(check.name);
                 }
                 if (status !== 'completed') {
                   isPending = true;
@@ -116,13 +138,9 @@ jobs:
 
               if (hasFailed) {
                 console.log(`❌ PR #${prNumber} has failed CI checks.`);
-                const added = await setLabel(prNumber, "Red");
-                if (added) {
-                  await github.rest.issues.createComment({
-                    owner, repo, issue_number: prNumber,
-                    body: `❌ **CI Pipeline Failed:** One or more CI checks have failed. Please fix the errors and push your changes again.`
-                  });
-                }
+                await setLabel(prNumber, "Red");
+                const failedNames = failedNamesList.map(n => `**${n}**`).join(", ");
+                await createOrUpdateComment(prNumber, `@${targetUser} ❌ CI checks failing: ${failedNames}. Please fix and push again.`, failureMarker);
                 continue;
               }
 
@@ -169,7 +187,5 @@ jobs:
               }
               if (!names.includes(labelToAdd)) {
                 await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: [labelToAdd] });
-                return true;
               }
-              return false;
             }
