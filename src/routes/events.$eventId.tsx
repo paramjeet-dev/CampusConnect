@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { OptimizedImage } from "@/components/media/OptimizedImage";
 import { parseCoordinates } from "@/lib/eventUtils";
+import { EventFeedbackForm } from "@/components/EventFeedbackForm";
 import { EventMap } from "@/components/EventMap";
 import {
   Breadcrumb,
@@ -774,6 +775,16 @@ export default function EventDetailsPage() {
               )}
             </div>
           )}
+
+          {/* Event Feedback (Only if ended and user RSVP'd) */}
+          {user &&
+            hasRsvpd &&
+            event.end_date &&
+            new Date(event.end_date).getTime() < Date.now() && (
+              <div className="mt-10">
+                <EventFeedbackForm eventId={event.id} user={user} />
+              </div>
+            )}
 
           {/* Social Share Buttons */}
           <div className="mt-10 border-t-2 border-black pt-6">
