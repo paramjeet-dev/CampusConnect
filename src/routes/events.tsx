@@ -2,7 +2,7 @@ import { SiteShell } from "@/components/site/SiteShell";
 import { useQuery, useMutation } from "@/hooks/useReactQueryReplacement";
 import { createClient } from "@/lib/supabase/client";
 import { useEmailVerification } from "@/hooks/useEmailVerification";
-import { useEffect, useState, useRef, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, lazy, Suspense, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
 import { EventCard } from "@/components/EventCard";
 import { CreateEventDialog } from "@/components/CreateEventDialog";
@@ -120,6 +120,7 @@ export default function EventsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -264,7 +265,7 @@ export default function EventsPage() {
     }
   }, [queryData]);
 
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
 
@@ -307,7 +308,25 @@ export default function EventsPage() {
     } finally {
       setIsLoadingMore(false);
     }
-  };
+  }, [isLoadingMore, hasMore, page, supabase]);
+
+  // Infinite scroll: auto-trigger load when sentinel enters the viewport
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, handleLoadMore]);
 
   useEffect(() => {
     const channel = supabase
@@ -854,6 +873,9 @@ export default function EventsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Sentinel element triggers infinite scroll */}
+                  <div ref={sentinelRef} aria-hidden="true" />
 
                   {hasMore ? (
                     <button
